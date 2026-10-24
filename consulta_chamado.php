@@ -6,9 +6,9 @@ $chamados = [];
 $erro = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $telefone_consulta = trim(filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING));
+    $telefone_consulta = trim((string) filter_input(INPUT_POST, 'telefone'));
 } elseif (isset($_GET['telefone'])) {
-    $telefone_consulta = trim(filter_input(INPUT_GET, 'telefone', FILTER_SANITIZE_STRING));
+    $telefone_consulta = trim((string) filter_input(INPUT_GET, 'telefone'));
 }
 
 if (!empty($telefone_consulta)) {

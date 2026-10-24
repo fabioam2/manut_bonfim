@@ -24,3 +24,9 @@ Sistema web em PHP + MySQL para abertura e acompanhamento de chamados de manuten
 4. Garanta que a pasta `uploads/` tenha permissão de escrita pelo servidor web.
 
 > `config.php` e o conteúdo de `uploads/` não são versionados (veja `.gitignore`).
+
+## Segurança
+
+- `seguranca.php` inicia a sessão com cookie protegido (HttpOnly, SameSite=Lax, Secure em HTTPS) e gera os tokens CSRF exigidos em todos os formulários e links de exclusão.
+- `uploads/.htaccess` impede a execução de scripts e a listagem das fotos; `database/.htaccess` bloqueia o acesso ao script SQL pelo navegador.
+- O usuário `admin` criado pelo `schema.sql` tem uma senha padrão: troque-a logo após a instalação.

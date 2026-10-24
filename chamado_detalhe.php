@@ -1,11 +1,16 @@
 <?php
-session_start();
+require_once 'seguranca.php';
+iniciar_sessao();
 require_once 'conexao.php';
 
 if (!isset($_SESSION['usuario_id']) || !in_array($_SESSION['usuario_tipo_acesso'], ['gerencia', 'admin'])) {
     session_destroy();
     header('Location: login_gerencia.php?erro=acesso_negado');
     exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verificar();
 }
 
 $id_chamado = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -20,11 +25,11 @@ $nome_usuario_logado = $_SESSION['usuario_nome'];
 $mensagem = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $novo_status = filter_input(INPUT_POST, 'status', FILTER_SANITIZE_STRING);
-    $nova_prioridade = filter_input(INPUT_POST, 'prioridade', FILTER_SANITIZE_STRING);
+    $novo_status = filter_input(INPUT_POST, 'status');
+    $nova_prioridade = filter_input(INPUT_POST, 'prioridade');
     $id_usuario_atribuido = filter_input(INPUT_POST, 'usuario_atribuido', FILTER_VALIDATE_INT);
     $id_grupo = filter_input(INPUT_POST, 'id_grupo', FILTER_VALIDATE_INT);
-    $comentario = trim(filter_input(INPUT_POST, 'comentario', FILTER_SANITIZE_STRING));
+    $comentario = trim((string) filter_input(INPUT_POST, 'comentario'));
 
     $status_permitidos = ['Aberto', 'Em Atendimento', 'Aguardando Peça', 'Finalizado', 'Cancelado'];
     $prioridades_permitidas = ['Baixa', 'Média', 'Alta'];
@@ -139,7 +144,7 @@ try {
             </div>
             <aside class="sidebar">
                 <h2>Gerenciar Chamado</h2>
-                <form action="chamado_detalhe.php?id=<?= $id_chamado ?>" method="POST">
+                <form action="chamado_detalhe.php?id=<?= $id_chamado ?>" method="POST"><?= csrf_campo() ?>
                     <div class="form-group"><label for="status">Alterar Status</label><select name="status" id="status"><?php foreach (['Aberto', 'Em Atendimento', 'Aguardando Peça', 'Finalizado', 'Cancelado'] as $s): ?><option value="<?= $s ?>" <?= $chamado['status'] == $s ? 'selected' : '' ?>><?= $s ?></option><?php endforeach; ?></select></div>
                     <div class="form-group"><label for="prioridade">Alterar Prioridade</label><select name="prioridade" id="prioridade"><?php foreach (['Baixa', 'Média', 'Alta'] as $p): ?><option value="<?= $p ?>" <?= $chamado['prioridade'] == $p ? 'selected' : '' ?>><?= $p ?></option><?php endforeach; ?></select></div>
                     

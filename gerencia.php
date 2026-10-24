@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once 'seguranca.php';
+iniciar_sessao();
 require_once 'conexao.php';
 
 if (!isset($_SESSION['usuario_id']) || !in_array($_SESSION['usuario_tipo_acesso'], ['gerencia', 'admin'])) {
@@ -13,7 +14,11 @@ $tipo_acesso_logado = $_SESSION['usuario_tipo_acesso'];
 $nome_usuario = $_SESSION['usuario_nome'];
 $mensagem = [];
 
-$view_mode = $_GET['view'] ?? 'meus_grupos';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verificar();
+}
+
+$view_mode = ($_GET['view'] ?? '') === 'todos' ? 'todos' : 'meus_grupos';
 
 if (isset($_GET['acao']) && $_GET['acao'] === 'sair') {
     session_destroy();
@@ -54,11 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['trocar_senha'])) {
 // --- PROCESSAR FORMULÁRIO DE ATUALIZAÇÃO RÁPIDA ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salvar_chamado'])) {
     $id_chamado = filter_input(INPUT_POST, 'id_chamado', FILTER_VALIDATE_INT);
-    $novo_status = filter_input(INPUT_POST, 'status', FILTER_SANITIZE_STRING);
+    $novo_status = filter_input(INPUT_POST, 'status');
     $id_grupo = filter_input(INPUT_POST, 'id_grupo', FILTER_VALIDATE_INT);
     $id_usuario_atribuido = filter_input(INPUT_POST, 'usuario_atribuido', FILTER_VALIDATE_INT);
 
-    if ($id_chamado) {
+    if ($id_chamado && in_array($novo_status, ['Aberto', 'Em Atendimento', 'Aguardando Peça', 'Finalizado', 'Cancelado'], true)) {
         $pdo->beginTransaction();
         try {
             $sql_update = "UPDATE chamados SET status = ?, id_grupo = ?, id_usuario_atribuido = ? WHERE id_chamado = ?";
@@ -138,7 +143,8 @@ try {
     }
 } catch (PDOException $e) {
     $chamados = [];
-    $erro_sistema = "Erro ao carregar dados: " . $e->getMessage();
+    error_log($e->getMessage());
+    $erro_sistema = "Erro ao carregar os dados. Tente novamente mais tarde.";
 }
 ?>
 <!DOCTYPE html>
@@ -227,7 +233,7 @@ try {
                                 <th><select name="filtro_status"><option value=""></option><?php foreach($status_permitidos as $s): ?><option value="<?= $s ?>" <?= $filtros['status'] == $s ? 'selected' : '' ?>><?= $s ?></option><?php endforeach; ?></select></th>
                                 <th><select name="filtro_grupo"><option value=""></option><?php foreach($todos_grupos as $g): ?><option value="<?= $g['id_grupo'] ?>" <?= $filtros['grupo'] == $g['id_grupo'] ? 'selected' : '' ?>><?= htmlspecialchars($g['nome']) ?></option><?php endforeach; ?></select></th>
                                 <th><select name="filtro_usuario"><option value=""></option><?php foreach($todos_usuarios as $u): ?><option value="<?= $u['id_usuario'] ?>" <?= $filtros['usuario'] == $u['id_usuario'] ? 'selected' : '' ?>><?= htmlspecialchars($u['nome_completo']) ?></option><?php endforeach; ?></select></th>
-                                <th><button type="submit" class="btn-filtro">Filtrar</button> <a href="gerencia.php?view=<?= $view_mode ?>" class="btn-limpar">Limpar</a></th>
+                                <th><button type="submit" class="btn-filtro">Filtrar</button> <a href="gerencia.php?view=<?= htmlspecialchars($view_mode) ?>" class="btn-limpar">Limpar</a></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -238,7 +244,7 @@ try {
                                     $cor_sla = getSlaColor($chamado['data_abertura'], $chamado['status'], $sla_regras);
                                 ?>
                                 <tr style="background-color: <?= $cor_sla ?>;">
-                                    <form action="gerencia.php?view=<?= htmlspecialchars($view_mode) ?>" method="POST">
+                                    <form action="gerencia.php?view=<?= htmlspecialchars($view_mode) ?>" method="POST"><?= csrf_campo() ?>
                                         <input type="hidden" name="id_chamado" value="<?= $chamado['id_chamado'] ?>">
                                         <td><?= htmlspecialchars(date('d/m/Y', strtotime($chamado['data_abertura']))) ?></td>
                                         <td><span class="tag prioridade-<?= htmlspecialchars($chamado['prioridade']) ?>"><?= htmlspecialchars($chamado['prioridade']) ?></span></td>
@@ -266,7 +272,7 @@ try {
       <div class="modal-content">
         <span class="close-button">&times;</span>
         <h2>Alterar Senha</h2>
-        <form action="gerencia.php" method="POST">
+        <form action="gerencia.php" method="POST"><?= csrf_campo() ?>
             <div class="form-group">
                 <label for="senha_antiga">Senha Antiga:</label>
                 <input type="password" id="senha_antiga" name="senha_antiga" required>

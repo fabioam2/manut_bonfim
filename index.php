@@ -1,21 +1,28 @@
 <?php
-session_start();
+require_once 'seguranca.php';
+iniciar_sessao();
 require_once 'conexao.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verificar();
+}
 
 $mensagem_sucesso = '';
 $mensagem_erro = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nome'])) {
-    $nome = trim(filter_input(INPUT_POST, 'nome', FILTER_SANITIZE_STRING));
-    $telefone = trim(filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING));
+    $nome = trim((string) filter_input(INPUT_POST, 'nome'));
+    $telefone = trim((string) filter_input(INPUT_POST, 'telefone'));
     $id_local = filter_input(INPUT_POST, 'local', FILTER_VALIDATE_INT);
     $id_servico = filter_input(INPUT_POST, 'servico', FILTER_VALIDATE_INT);
-    $prioridade = filter_input(INPUT_POST, 'prioridade', FILTER_SANITIZE_STRING);
-    $descricao = trim(filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING));
+    $prioridade = filter_input(INPUT_POST, 'prioridade');
+    $descricao = trim((string) filter_input(INPUT_POST, 'descricao'));
     $foto_path = null;
 
     if (empty($nome) || empty($telefone) || !$id_local || !$id_servico || empty($prioridade) || empty($descricao)) {
         $mensagem_erro = "Por favor, preencha todos os campos obrigatórios.";
+    } elseif (!in_array($prioridade, ['Baixa', 'Média', 'Alta'], true)) {
+        $mensagem_erro = "Prioridade inválida.";
     } else {
         $stmt_grupo = $pdo->prepare("SELECT id_grupo FROM servicos WHERE id_servico = ?");
         $stmt_grupo->execute([$id_servico]);
@@ -23,26 +30,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nome'])) {
 
         if (isset($_FILES['foto']) && $_FILES['foto']['error'] == UPLOAD_ERR_OK) {
             $foto_tmp = $_FILES['foto']['tmp_name'];
-            $foto_nome_original = $_FILES['foto']['name'];
-            $extensao = strtolower(pathinfo($foto_nome_original, PATHINFO_EXTENSION));
-            if (in_array($extensao, ['jpg', 'jpeg', 'png', 'gif'])) {
+            // O tipo é detectado pelo conteúdo do arquivo, não pelo nome enviado
+            $info_imagem = @getimagesize($foto_tmp);
+            $tipos_permitidos = [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF];
+            if ($info_imagem && in_array($info_imagem[2], $tipos_permitidos, true) && $info_imagem[0] > 0 && $info_imagem[1] > 0 && $info_imagem[0] * $info_imagem[1] <= 40000000) {
+                list($largura, $altura) = $info_imagem;
                 $diretorio_uploads = 'uploads/';
-                if (!is_dir($diretorio_uploads)) { mkdir($diretorio_uploads, 0777, true); }
-                $foto_nome_novo = uniqid('foto_', true) . '.' . $extensao;
+                if (!is_dir($diretorio_uploads)) { mkdir($diretorio_uploads, 0755, true); }
+                // A imagem é sempre regravada como JPEG, então a extensão é sempre .jpg
+                $foto_nome_novo = uniqid('foto_', true) . '.jpg';
                 $foto_path_completo = $diretorio_uploads . $foto_nome_novo;
-                list($largura, $altura) = getimagesize($foto_tmp);
                 $max_largura = 800; $max_altura = 600;
                 $ratio = $largura / $altura;
                 if ($max_largura / $max_altura > $ratio) { $max_largura = $max_altura * $ratio; } else { $max_altura = $max_largura / $ratio; }
-                $imagem_redimensionada = imagecreatetruecolor($max_largura, $max_altura);
-                switch($extensao) {
-                    case 'jpg': case 'jpeg': $imagem_origem = imagecreatefromjpeg($foto_tmp); break;
-                    case 'png': $imagem_origem = imagecreatefrompng($foto_tmp); break;
-                    case 'gif': $imagem_origem = imagecreatefromgif($foto_tmp); break;
+                $imagem_redimensionada = imagecreatetruecolor((int) $max_largura, (int) $max_altura);
+                switch($info_imagem[2]) {
+                    case IMAGETYPE_JPEG: $imagem_origem = @imagecreatefromjpeg($foto_tmp); break;
+                    case IMAGETYPE_PNG: $imagem_origem = @imagecreatefrompng($foto_tmp); break;
+                    case IMAGETYPE_GIF: $imagem_origem = @imagecreatefromgif($foto_tmp); break;
                 }
-                imagecopyresampled($imagem_redimensionada, $imagem_origem, 0, 0, 0, 0, $max_largura, $max_altura, $largura, $altura);
-                if (imagejpeg($imagem_redimensionada, $foto_path_completo, 85)) { $foto_path = $foto_path_completo; }
-                imagedestroy($imagem_origem); imagedestroy($imagem_redimensionada);
+                if ($imagem_origem) {
+                    imagecopyresampled($imagem_redimensionada, $imagem_origem, 0, 0, 0, 0, (int) $max_largura, (int) $max_altura, $largura, $altura);
+                    if (imagejpeg($imagem_redimensionada, $foto_path_completo, 85)) { $foto_path = $foto_path_completo; }
+                    imagedestroy($imagem_origem);
+                } else { $mensagem_erro = "Não foi possível processar a imagem enviada."; }
+                imagedestroy($imagem_redimensionada);
             } else { $mensagem_erro = "Formato de arquivo de imagem inválido."; }
         }
 
@@ -112,7 +124,7 @@ try {
         </div>
         <?php if ($mensagem_sucesso): ?><div class="mensagem mensagem-sucesso"><?= $mensagem_sucesso ?></div><?php endif; ?>
         <?php if ($mensagem_erro): ?><div class="mensagem mensagem-erro"><?= $mensagem_erro ?></div><?php endif; ?>
-        <form id="form-chamado" action="index.php" method="POST" enctype="multipart/form-data">
+        <form id="form-chamado" action="index.php" method="POST" enctype="multipart/form-data"><?= csrf_campo() ?>
 
             <div class="info-solicitante">
                 <div class="form-group">

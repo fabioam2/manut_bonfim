@@ -1,11 +1,16 @@
 <?php
-session_start();
+require_once 'seguranca.php';
+iniciar_sessao();
 require_once 'conexao.php';
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['usuario_tipo_acesso'] !== 'admin') {
     session_destroy();
     header('Location: login.php?erro=acesso_negado');
     exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' || ($_GET['acao'] ?? '') === 'excluir') {
+    csrf_verificar();
 }
 
 $nome_usuario = $_SESSION['usuario_nome'];
@@ -60,7 +65,7 @@ if ($tabela_selecionada === 'sla') {
 if ($tabela_selecionada === 'grupos') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salvar_grupo'])) {
         $id_grupo = filter_input(INPUT_POST, 'id_grupo', FILTER_VALIDATE_INT);
-        $nome_grupo = trim(filter_input(INPUT_POST, 'nome', FILTER_SANITIZE_STRING));
+        $nome_grupo = trim((string) filter_input(INPUT_POST, 'nome'));
         if (empty($nome_grupo)) {
             $mensagem = ['tipo' => 'erro', 'texto' => 'O nome do grupo é obrigatório.'];
         } else {
@@ -100,7 +105,7 @@ if ($tabela_selecionada === 'grupos') {
 if ($tabela_selecionada === 'locais') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salvar_local'])) {
         $id_local = filter_input(INPUT_POST, 'id_local', FILTER_VALIDATE_INT);
-        $nome_local = trim(filter_input(INPUT_POST, 'nome', FILTER_SANITIZE_STRING));
+        $nome_local = trim((string) filter_input(INPUT_POST, 'nome'));
         if (empty($nome_local)) {
             $mensagem = ['tipo' => 'erro', 'texto' => 'O nome do local é obrigatório.'];
         } else {
@@ -138,7 +143,7 @@ if ($tabela_selecionada === 'locais') {
 if ($tabela_selecionada === 'servicos') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salvar_servico'])) {
         $id_servico = filter_input(INPUT_POST, 'id_servico', FILTER_VALIDATE_INT);
-        $nome_servico = trim(filter_input(INPUT_POST, 'nome', FILTER_SANITIZE_STRING));
+        $nome_servico = trim((string) filter_input(INPUT_POST, 'nome'));
         $id_grupo = filter_input(INPUT_POST, 'id_grupo', FILTER_VALIDATE_INT);
         if (empty($nome_servico)) {
             $mensagem = ['tipo' => 'erro', 'texto' => 'O nome do serviço é obrigatório.'];
@@ -178,10 +183,10 @@ if ($tabela_selecionada === 'servicos') {
 if ($tabela_selecionada === 'usuarios') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salvar_usuario'])) {
         $id_usuario = filter_input(INPUT_POST, 'id_usuario', FILTER_VALIDATE_INT);
-        $nome_completo = trim(filter_input(INPUT_POST, 'nome_completo', FILTER_SANITIZE_STRING));
-        $login = trim(filter_input(INPUT_POST, 'login', FILTER_SANITIZE_STRING));
+        $nome_completo = trim((string) filter_input(INPUT_POST, 'nome_completo'));
+        $login = trim((string) filter_input(INPUT_POST, 'login'));
         $senha = $_POST['senha'];
-        $tipo_acesso = $_POST['tipo_acesso'];
+        $tipo_acesso = in_array($_POST['tipo_acesso'] ?? '', ['admin', 'gerencia', 'Geral'], true) ? $_POST['tipo_acesso'] : 'gerencia';
         $ativo = isset($_POST['ativo']) ? 1 : 0;
         $grupos_usuario = $_POST['grupos'] ?? [];
 
@@ -303,7 +308,7 @@ if ($tabela_selecionada === 'usuarios') {
             <div class="content-box">
                 <h2>Configuração de SLA</h2>
                 <p>Defina os intervalos de dias para cada nível de SLA.</p>
-                <form action="admin.php?tabela=sla" method="POST">
+                <form action="admin.php?tabela=sla" method="POST"><?= csrf_campo() ?>
                     <div class="sla-grid"><strong>Nível</strong><strong>De (dias)</strong><strong>Até (dias)</strong></div><hr style="margin-bottom: 20px;">
                     <div class="sla-grid"><label>Normal</label><input type="number" name="normal_inicio" value="<?= $sla_config['Normal']['dias_inicio'] ?? 0 ?>" required><input type="number" name="normal_fim" value="<?= $sla_config['Normal']['dias_fim'] ?? 14 ?>" required></div>
                     <div class="sla-grid"><label>Atenção</label><input type="number" name="atencao_inicio" value="<?= $sla_config['Atenção']['dias_inicio'] ?? 15 ?>" required><input type="number" name="atencao_fim" value="<?= $sla_config['Atenção']['dias_fim'] ?? 30 ?>" required></div>
@@ -316,32 +321,32 @@ if ($tabela_selecionada === 'usuarios') {
             <?php if ($tabela_selecionada === 'grupos'): ?>
             <div class="content-box">
                 <h2>Gerenciar Grupos</h2>
-                <form action="admin.php?tabela=grupos" method="POST"><input type="hidden" name="id_grupo" value="<?= $grupo_para_editar['id_grupo'] ?? '' ?>"><div class="form-group"><label><?= isset($grupo_para_editar) ? 'Editar Nome do Grupo' : 'Novo Grupo' ?></label><input type="text" name="nome" value="<?= htmlspecialchars($grupo_para_editar['nome'] ?? '') ?>" required autofocus></div><button type="submit" name="salvar_grupo" class="btn btn-primary">Salvar</button><?php if (isset($grupo_para_editar)): ?><a href="admin.php?tabela=grupos" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
-                <hr style="margin: 30px 0;"><h3>Grupos Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Ações</th></tr></thead><tbody><?php foreach ($grupos as $grupo): ?><tr><td><?= $grupo['id_grupo'] ?></td><td><?= htmlspecialchars($grupo['nome']) ?></td><td class="action-links"><a href="admin.php?tabela=grupos&acao=editar&id=<?= $grupo['id_grupo'] ?>">Editar</a><a href="admin.php?tabela=grupos&acao=excluir&id=<?= $grupo['id_grupo'] ?>" class="delete" onclick="return confirm('Deseja excluir este grupo?');">Excluir</a></td></tr><?php endforeach; ?></tbody></table>
+                <form action="admin.php?tabela=grupos" method="POST"><?= csrf_campo() ?><input type="hidden" name="id_grupo" value="<?= $grupo_para_editar['id_grupo'] ?? '' ?>"><div class="form-group"><label><?= isset($grupo_para_editar) ? 'Editar Nome do Grupo' : 'Novo Grupo' ?></label><input type="text" name="nome" value="<?= htmlspecialchars($grupo_para_editar['nome'] ?? '') ?>" required autofocus></div><button type="submit" name="salvar_grupo" class="btn btn-primary">Salvar</button><?php if (isset($grupo_para_editar)): ?><a href="admin.php?tabela=grupos" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
+                <hr style="margin: 30px 0;"><h3>Grupos Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Ações</th></tr></thead><tbody><?php foreach ($grupos as $grupo): ?><tr><td><?= $grupo['id_grupo'] ?></td><td><?= htmlspecialchars($grupo['nome']) ?></td><td class="action-links"><a href="admin.php?tabela=grupos&acao=editar&id=<?= $grupo['id_grupo'] ?>">Editar</a><a href="admin.php?tabela=grupos&acao=excluir&id=<?= $grupo['id_grupo'] ?>&token=<?= csrf_token() ?>" class="delete" onclick="return confirm('Deseja excluir este grupo?');">Excluir</a></td></tr><?php endforeach; ?></tbody></table>
             </div>
             <?php endif; ?>
 
             <?php if ($tabela_selecionada === 'locais'): ?>
             <div class="content-box">
                 <h2>Gerenciar Locais</h2>
-                <form action="admin.php?tabela=locais" method="POST"><input type="hidden" name="id_local" value="<?= $local_para_editar['id_local'] ?? '' ?>"><div class="form-group"><label><?= isset($local_para_editar) ? 'Editar Nome do Local' : 'Novo Local' ?></label><input type="text" name="nome" value="<?= htmlspecialchars($local_para_editar['nome'] ?? '') ?>" required autofocus></div><button type="submit" name="salvar_local" class="btn btn-primary">Salvar</button><?php if (isset($local_para_editar)): ?><a href="admin.php?tabela=locais" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
-                <hr style="margin: 30px 0;"><h3>Locais Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Ações</th></tr></thead><tbody><?php foreach ($locais as $local): ?><tr><td><?= $local['id_local'] ?></td><td><?= htmlspecialchars($local['nome']) ?></td><td class="action-links"><a href="admin.php?tabela=locais&acao=editar&id=<?= $local['id_local'] ?>">Editar</a><a href="admin.php?tabela=locais&acao=excluir&id=<?= $local['id_local'] ?>" class="delete" onclick="return confirm('Deseja excluir este local?');">Excluir</a></td></tr><?php endforeach; ?></tbody></table>
+                <form action="admin.php?tabela=locais" method="POST"><?= csrf_campo() ?><input type="hidden" name="id_local" value="<?= $local_para_editar['id_local'] ?? '' ?>"><div class="form-group"><label><?= isset($local_para_editar) ? 'Editar Nome do Local' : 'Novo Local' ?></label><input type="text" name="nome" value="<?= htmlspecialchars($local_para_editar['nome'] ?? '') ?>" required autofocus></div><button type="submit" name="salvar_local" class="btn btn-primary">Salvar</button><?php if (isset($local_para_editar)): ?><a href="admin.php?tabela=locais" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
+                <hr style="margin: 30px 0;"><h3>Locais Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Ações</th></tr></thead><tbody><?php foreach ($locais as $local): ?><tr><td><?= $local['id_local'] ?></td><td><?= htmlspecialchars($local['nome']) ?></td><td class="action-links"><a href="admin.php?tabela=locais&acao=editar&id=<?= $local['id_local'] ?>">Editar</a><a href="admin.php?tabela=locais&acao=excluir&id=<?= $local['id_local'] ?>&token=<?= csrf_token() ?>" class="delete" onclick="return confirm('Deseja excluir este local?');">Excluir</a></td></tr><?php endforeach; ?></tbody></table>
             </div>
             <?php endif; ?>
 
             <?php if ($tabela_selecionada === 'servicos'): ?>
             <div class="content-box">
                 <h2>Gerenciar Serviços</h2>
-                <form action="admin.php?tabela=servicos" method="POST"><input type="hidden" name="id_servico" value="<?= $servico_para_editar['id_servico'] ?? '' ?>"><div class="form-group"><label>Nome do Serviço</label><input type="text" name="nome" value="<?= htmlspecialchars($servico_para_editar['nome'] ?? '') ?>" required></div><div class="form-group"><label>Grupo de Trabalho Responsável</label><select name="id_grupo"><option value="">-- Nenhum --</option><?php foreach($grupos_select as $grupo): ?><option value="<?= $grupo['id_grupo'] ?>" <?= (isset($servico_para_editar) && $servico_para_editar['id_grupo'] == $grupo['id_grupo']) ? 'selected' : '' ?>><?= htmlspecialchars($grupo['nome']) ?></option><?php endforeach; ?></select></div><button type="submit" name="salvar_servico" class="btn btn-primary">Salvar</button><?php if (isset($servico_para_editar)): ?><a href="admin.php?tabela=servicos" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
-                <hr style="margin: 30px 0;"><h3>Serviços Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Grupo Responsável</th><th>Ações</th></tr></thead><tbody><?php foreach ($servicos as $servico): ?><tr><td><?= $servico['id_servico'] ?></td><td><?= htmlspecialchars($servico['nome']) ?></td><td><?= htmlspecialchars($servico['nome_grupo'] ?? 'N/A') ?></td><td class="action-links"><a href="admin.php?tabela=servicos&acao=editar&id=<?= $servico['id_servico'] ?>">Editar</a><a href="admin.php?tabela=servicos&acao=excluir&id=<?= $servico['id_servico'] ?>" class="delete" onclick="return confirm('Deseja excluir este serviço?');">Excluir</a></td></tr><?php endforeach; ?></tbody></table>
+                <form action="admin.php?tabela=servicos" method="POST"><?= csrf_campo() ?><input type="hidden" name="id_servico" value="<?= $servico_para_editar['id_servico'] ?? '' ?>"><div class="form-group"><label>Nome do Serviço</label><input type="text" name="nome" value="<?= htmlspecialchars($servico_para_editar['nome'] ?? '') ?>" required></div><div class="form-group"><label>Grupo de Trabalho Responsável</label><select name="id_grupo"><option value="">-- Nenhum --</option><?php foreach($grupos_select as $grupo): ?><option value="<?= $grupo['id_grupo'] ?>" <?= (isset($servico_para_editar) && $servico_para_editar['id_grupo'] == $grupo['id_grupo']) ? 'selected' : '' ?>><?= htmlspecialchars($grupo['nome']) ?></option><?php endforeach; ?></select></div><button type="submit" name="salvar_servico" class="btn btn-primary">Salvar</button><?php if (isset($servico_para_editar)): ?><a href="admin.php?tabela=servicos" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
+                <hr style="margin: 30px 0;"><h3>Serviços Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Grupo Responsável</th><th>Ações</th></tr></thead><tbody><?php foreach ($servicos as $servico): ?><tr><td><?= $servico['id_servico'] ?></td><td><?= htmlspecialchars($servico['nome']) ?></td><td><?= htmlspecialchars($servico['nome_grupo'] ?? 'N/A') ?></td><td class="action-links"><a href="admin.php?tabela=servicos&acao=editar&id=<?= $servico['id_servico'] ?>">Editar</a><a href="admin.php?tabela=servicos&acao=excluir&id=<?= $servico['id_servico'] ?>&token=<?= csrf_token() ?>" class="delete" onclick="return confirm('Deseja excluir este serviço?');">Excluir</a></td></tr><?php endforeach; ?></tbody></table>
             </div>
             <?php endif; ?>
 
             <?php if ($tabela_selecionada === 'usuarios'): ?>
             <div class="content-box">
                 <h2>Gerenciar Usuários</h2>
-                <form action="admin.php?tabela=usuarios" method="POST"><input type="hidden" name="id_usuario" value="<?= $usuario_para_editar['id_usuario'] ?? '' ?>"><div class="form-grid"><div class="form-group"><label>Nome Completo</label><input type="text" name="nome_completo" value="<?= htmlspecialchars($usuario_para_editar['nome_completo'] ?? '') ?>" required></div><div class="form-group"><label>Login</label><input type="text" name="login" value="<?= htmlspecialchars($usuario_para_editar['login'] ?? '') ?>" required></div><div class="form-group"><label>Senha</label><input type="password" name="senha" placeholder="<?= isset($usuario_para_editar) ? 'Deixe em branco para não alterar' : '' ?>"></div><div class="form-group"><label>Tipo de Acesso</label><select name="tipo_acesso" required><option value="admin" <?= (isset($usuario_para_editar) && $usuario_para_editar['tipo_acesso'] == 'admin') ? 'selected' : '' ?>>Admin</option><option value="gerencia" <?= (isset($usuario_para_editar) && $usuario_para_editar['tipo_acesso'] == 'gerencia') ? 'selected' : '' ?>>Gerência</option><option value="Geral" <?= (isset($usuario_para_editar) && $usuario_para_editar['tipo_acesso'] == 'Geral') ? 'selected' : '' ?>>Geral</option></select></div></div><div class="form-group"><label>Grupos de Trabalho</label><?php foreach($grupos_select as $grupo): ?><div class="checkbox-group"><input type="checkbox" name="grupos[]" id="grupo_<?= $grupo['id_grupo'] ?>" value="<?= $grupo['id_grupo'] ?>" <?= (isset($grupos_do_usuario) && in_array($grupo['id_grupo'], $grupos_do_usuario)) ? 'checked' : '' ?>><label for="grupo_<?= $grupo['id_grupo'] ?>"><?= htmlspecialchars($grupo['nome']) ?></label></div><?php endforeach; ?></div><div class="form-group checkbox-group"><input type="checkbox" name="ativo" id="ativo" value="1" <?= (!isset($usuario_para_editar) || $usuario_para_editar['ativo']) ? 'checked' : '' ?>><label for="ativo">Usuário Ativo</label></div><button type="submit" name="salvar_usuario" class="btn btn-primary">Salvar</button><?php if (isset($usuario_para_editar)): ?><a href="admin.php?tabela=usuarios" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
-                <hr style="margin: 30px 0;"><h3>Usuários Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Login</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead><tbody><?php foreach ($usuarios as $usuario): ?><tr><td><?= $usuario['id_usuario'] ?></td><td><?= htmlspecialchars($usuario['nome_completo']) ?></td><td><?= htmlspecialchars($usuario['login']) ?></td><td><?= ucfirst($usuario['tipo_acesso']) ?></td><td><?= $usuario['ativo'] ? 'Ativo' : 'Inativo' ?></td><td class="action-links"><a href="admin.php?tabela=usuarios&acao=editar&id=<?= $usuario['id_usuario'] ?>">Editar</a><?php if ($usuario['id_usuario'] != $id_usuario_logado): ?><a href="admin.php?tabela=usuarios&acao=excluir&id=<?= $usuario['id_usuario'] ?>" class="delete" onclick="return confirm('Deseja excluir este usuário?');">Excluir</a><?php endif; ?></td></tr><?php endforeach; ?></tbody></table>
+                <form action="admin.php?tabela=usuarios" method="POST"><?= csrf_campo() ?><input type="hidden" name="id_usuario" value="<?= $usuario_para_editar['id_usuario'] ?? '' ?>"><div class="form-grid"><div class="form-group"><label>Nome Completo</label><input type="text" name="nome_completo" value="<?= htmlspecialchars($usuario_para_editar['nome_completo'] ?? '') ?>" required></div><div class="form-group"><label>Login</label><input type="text" name="login" value="<?= htmlspecialchars($usuario_para_editar['login'] ?? '') ?>" required></div><div class="form-group"><label>Senha</label><input type="password" name="senha" placeholder="<?= isset($usuario_para_editar) ? 'Deixe em branco para não alterar' : '' ?>"></div><div class="form-group"><label>Tipo de Acesso</label><select name="tipo_acesso" required><option value="admin" <?= (isset($usuario_para_editar) && $usuario_para_editar['tipo_acesso'] == 'admin') ? 'selected' : '' ?>>Admin</option><option value="gerencia" <?= (isset($usuario_para_editar) && $usuario_para_editar['tipo_acesso'] == 'gerencia') ? 'selected' : '' ?>>Gerência</option><option value="Geral" <?= (isset($usuario_para_editar) && $usuario_para_editar['tipo_acesso'] == 'Geral') ? 'selected' : '' ?>>Geral</option></select></div></div><div class="form-group"><label>Grupos de Trabalho</label><?php foreach($grupos_select as $grupo): ?><div class="checkbox-group"><input type="checkbox" name="grupos[]" id="grupo_<?= $grupo['id_grupo'] ?>" value="<?= $grupo['id_grupo'] ?>" <?= (isset($grupos_do_usuario) && in_array($grupo['id_grupo'], $grupos_do_usuario)) ? 'checked' : '' ?>><label for="grupo_<?= $grupo['id_grupo'] ?>"><?= htmlspecialchars($grupo['nome']) ?></label></div><?php endforeach; ?></div><div class="form-group checkbox-group"><input type="checkbox" name="ativo" id="ativo" value="1" <?= (!isset($usuario_para_editar) || $usuario_para_editar['ativo']) ? 'checked' : '' ?>><label for="ativo">Usuário Ativo</label></div><button type="submit" name="salvar_usuario" class="btn btn-primary">Salvar</button><?php if (isset($usuario_para_editar)): ?><a href="admin.php?tabela=usuarios" class="btn btn-secondary">Cancelar</a><?php endif; ?></form>
+                <hr style="margin: 30px 0;"><h3>Usuários Cadastrados</h3><table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Login</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead><tbody><?php foreach ($usuarios as $usuario): ?><tr><td><?= $usuario['id_usuario'] ?></td><td><?= htmlspecialchars($usuario['nome_completo']) ?></td><td><?= htmlspecialchars($usuario['login']) ?></td><td><?= ucfirst($usuario['tipo_acesso']) ?></td><td><?= $usuario['ativo'] ? 'Ativo' : 'Inativo' ?></td><td class="action-links"><a href="admin.php?tabela=usuarios&acao=editar&id=<?= $usuario['id_usuario'] ?>">Editar</a><?php if ($usuario['id_usuario'] != $id_usuario_logado): ?><a href="admin.php?tabela=usuarios&acao=excluir&id=<?= $usuario['id_usuario'] ?>&token=<?= csrf_token() ?>" class="delete" onclick="return confirm('Deseja excluir este usuário?');">Excluir</a><?php endif; ?></td></tr><?php endforeach; ?></tbody></table>
             </div>
             <?php endif; ?>
 

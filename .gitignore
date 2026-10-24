@@ -4,6 +4,7 @@ config.php
 # Fotos enviadas pelos usuários
 uploads/*
 !uploads/.gitkeep
+!uploads/.htaccess
 
 # Sistema / editores
 .DS_Store

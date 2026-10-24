@@ -1,5 +1,10 @@
 <?php
-session_start();
+require_once 'seguranca.php';
+iniciar_sessao();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verificar();
+}
 
 // Se o usuário já estiver logado, redireciona para a página de gerência
 if (isset($_SESSION['usuario_id']) && in_array($_SESSION['usuario_tipo_acesso'], ['gerencia', 'admin'])) {
@@ -12,7 +17,7 @@ require_once 'conexao.php';
 $erro_login = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $login = trim(filter_input(INPUT_POST, 'login', FILTER_SANITIZE_STRING));
+    $login = trim((string) filter_input(INPUT_POST, 'login'));
     $senha = $_POST['senha'];
 
     if (empty($login) || empty($senha)) {
@@ -72,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if (!empty($erro_login)): ?>
             <div class="mensagem-erro"><?= htmlspecialchars($erro_login) ?></div>
         <?php endif; ?>
-        <form action="login_gerencia.php" method="POST">
+        <form action="login_gerencia.php" method="POST"><?= csrf_campo() ?>
             <div class="form-group">
                 <label for="login">Usuário</label>
                 <input type="text" id="login" name="login" required autofocus>

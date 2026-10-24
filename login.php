@@ -1,6 +1,11 @@
 <?php
 // Inicia a sessão. É fundamental que esta seja a primeira coisa no script.
-session_start();
+require_once 'seguranca.php';
+iniciar_sessao();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verificar();
+}
 
 // Se o usuário já estiver logado, redireciona para a página de admin
 if (isset($_SESSION['usuario_id']) && isset($_SESSION['usuario_tipo_acesso']) && $_SESSION['usuario_tipo_acesso'] === 'admin') {
@@ -14,7 +19,7 @@ $erro_login = '';
 
 // Verifica se o formulário foi submetido
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $login = trim(filter_input(INPUT_POST, 'login', FILTER_SANITIZE_STRING));
+    $login = trim((string) filter_input(INPUT_POST, 'login'));
     $senha = $_POST['senha']; // Pega a senha sem sanitização para verificação
 
     if (empty($login) || empty($senha)) {
@@ -96,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="mensagem-erro"><?= htmlspecialchars($erro_login) ?></div>
         <?php endif; ?>
 
-        <form action="login.php" method="POST">
+        <form action="login.php" method="POST"><?= csrf_campo() ?>
             <div class="form-group">
                 <label for="login">Usuário</label>
                 <input type="text" id="login" name="login" required autofocus>
