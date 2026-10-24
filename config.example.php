@@ -5,8 +5,8 @@
  */
 return [
     'db_host'    => 'localhost',
-    'db_name'    => 'u154867272_manut',
-    'db_user'    => 'u154867272_manut',
+    'db_name'    => 'u154867272_manut2',
+    'db_user'    => 'u154867272_manut2',
     'db_pass'    => 'SUA_SENHA_AQUI',
     'db_charset' => 'utf8mb4',
 ];
