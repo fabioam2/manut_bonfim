@@ -1,0 +1,12 @@
+# Credenciais locais
+config.php
+
+# Fotos enviadas pelos usuários
+uploads/*
+!uploads/.gitkeep
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
